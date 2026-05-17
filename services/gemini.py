@@ -10,24 +10,19 @@ from core.config import GEMINI_API_KEY, GEMINI_MODEL, MEGUMI_PROMPT, TACO_PROMPT
 log = logging.getLogger("megumi")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-client  = genai.Client(api_key=GEMINI_API_KEY)
-_JSON_RE = re.compile(r'\{.*?}', re.DOTALL)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def extrair_alimento(texto: str, imagem_bytes: bytes | None = None) -> dict:
-    """Normaliza texto/imagem para o padrão TACO e estima peso em gramas."""
-    tem_texto  = bool(texto.strip())
-    tem_imagem = bool(imagem_bytes)
-
-    if not tem_texto and not tem_imagem:
+    if not texto.strip() and not imagem_bytes:
         return {"alimento": None, "gramas": None}
 
     try:
         parts: list = []
-        if tem_imagem:
+        if imagem_bytes:
             parts.append(types.Part.from_bytes(data=imagem_bytes, mime_type="image/jpeg"))
         parts.append(
-            texto if tem_texto
+            texto if texto.strip()
             else "Identifique o alimento principal nesta imagem e estime o peso em gramas."
         )
 
@@ -54,7 +49,7 @@ def extrair_alimento(texto: str, imagem_bytes: bytes | None = None) -> dict:
         if raw.startswith("```"):
             raw = raw.split("```")[1].removeprefix("json").strip()
 
-        match = _JSON_RE.search(raw)
+        match = re.search(r'\{.*?}', raw, re.DOTALL)
         if not match:
             log.warning(f"[EXTRAIR] Nenhum JSON encontrado: {raw!r}")
             return {"alimento": None, "gramas": None}
@@ -69,7 +64,7 @@ def extrair_alimento(texto: str, imagem_bytes: bytes | None = None) -> dict:
             except (TypeError, ValueError):
                 gramas = None
 
-        log.info(f"[EXTRAIR] alimento={alimento!r} gramas={gramas} imagem={'sim' if tem_imagem else 'não'}")
+        log.info(f"[EXTRAIR] alimento={alimento!r} gramas={gramas} imagem={'sim' if imagem_bytes else 'não'}")
         return {"alimento": alimento, "gramas": gramas}
 
     except Exception as e:
@@ -78,7 +73,6 @@ def extrair_alimento(texto: str, imagem_bytes: bytes | None = None) -> dict:
 
 
 def _formatar_saude(saude: dict) -> str:
-    """Converte dados de saúde do usuário para texto legível pela Megumi."""
     partes = []
 
     perfil = saude.get("perfil", {})
@@ -112,11 +106,11 @@ def _formatar_saude(saude: dict) -> str:
 
 def responder_megumi(
         texto:        str,
-        contexto:     str              = "",
-        imagem_bytes: bytes | None     = None,
+        contexto:     str               = "",
+        imagem_bytes: bytes | None      = None,
         historico:    list[dict] | None = None,
-        saude_json:   dict | None      = None,
-) -> str:
+        saude_json:   dict | None       = None,
+) -> str | None:
     contents: list[types.Content] = [
         types.Content(
             role  = "user" if msg["papel"] == "user" else "model",
@@ -129,7 +123,7 @@ def responder_megumi(
     if imagem_bytes:
         turno.append(types.Part.from_bytes(data=imagem_bytes, mime_type="image/jpeg"))
 
-    partes_ctx = [p for p in [contexto, _formatar_saude(saude_json) if saude_json else ""] if p]
+    partes_ctx  = [p for p in [contexto, _formatar_saude(saude_json) if saude_json else ""] if p]
     texto_turno = f"{texto}\n\n{chr(10).join(partes_ctx)}".strip() or "Analise esta imagem nutricional."
     turno.append(types.Part(text=texto_turno))
     contents.append(types.Content(role="user", parts=turno))

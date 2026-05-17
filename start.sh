@@ -9,11 +9,10 @@ if [ -f .env ]; then
     set +a
 fi
 
+# Útil para rodar junto com o cloudflared para rodar na WEB
 cloudflared tunnel run --token "$CLOUDFLARED_TOKEN" > /dev/null 2>&1 &
 CLOUDFLARED_PID=$!
 
-# Inicia uvicorn
 uvicorn main:app --host localhost --port 5000
 
-# Mata o cloudflared junto com o programa, aí tudo fica certinho
 kill $CLOUDFLARED_PID

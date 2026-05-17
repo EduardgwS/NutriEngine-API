@@ -5,7 +5,6 @@ from pathlib import Path
 
 log = logging.getLogger("megumi")
 
-# Caminho correto: raiz_do_projeto/data/receitas.json
 _RECEITAS_PATH = Path(__file__).resolve().parent.parent / "data" / "receitas.json"
 
 
@@ -20,10 +19,10 @@ def _carregar_receitas() -> dict:
         return {}
 
 
+_CATALOGO = _carregar_receitas()
+
 def receita_do_dia(objetivo: str) -> dict | None:
-    """Seleciona uma receita do catálogo com base no dia do ano (troca a cada 24h)."""
-    catalogo = _carregar_receitas()
-    lista    = catalogo.get(objetivo.upper())
+    lista = _CATALOGO.get(objetivo.upper())
 
     if not lista:
         log.warning(f"[RECEITAS] Objetivo '{objetivo}' não encontrado ou lista vazia.")

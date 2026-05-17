@@ -1,29 +1,21 @@
-import psycopg2
+from contextlib import contextmanager
+
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
-from contextlib import contextmanager
+
 from core.config import PG_DSN
 
-_pool: ThreadedConnectionPool | None = None
-_MIN_CONN = 2
-_MAX_CONN = 10
 
-
-def _get_pool() -> ThreadedConnectionPool | None:
-    global _pool
-    if _pool is None:
-        _pool = ThreadedConnectionPool(
-            _MIN_CONN, _MAX_CONN,
-            PG_DSN,
-            cursor_factory=psycopg2.extras.RealDictCursor,
-        )
-    return _pool
+_pool = ThreadedConnectionPool(
+    2, 10,
+    PG_DSN,
+    cursor_factory=psycopg2.extras.RealDictCursor,
+)
 
 
 @contextmanager
 def conn():
-    pool = _get_pool()
-    c = pool.getconn()
+    c = _pool.getconn()
     try:
         yield c
         c.commit()
@@ -31,13 +23,11 @@ def conn():
         c.rollback()
         raise
     finally:
-        pool.putconn(c)
-
+        _pool.putconn(c)
 
 
 def _build_like_parts(query: str) -> tuple[list[str], list[str]]:
-
-    palavras   = [p for p in query.strip().lower().split() if len(p) > 2] or query.split()
+    palavras    = [p for p in query.strip().lower().split() if len(p) > 2] or query.split()
     like_params = [f"%{p}%" for p in palavras]
     return palavras, like_params
 
@@ -51,7 +41,6 @@ def upsert_user(username: str, name: str, email: str):
         """, (username, name, email))
 
 
-
 def salvar_mensagem(username: str, papel: str, mensagem: str):
     with conn() as c, c.cursor() as cur:
         cur.execute(
@@ -63,7 +52,7 @@ def salvar_mensagem(username: str, papel: str, mensagem: str):
 def carregar_historico(username: str, limite: int = 20) -> list[dict]:
     with conn() as c, c.cursor() as cur:
         cur.execute("""
-            SELECT papel, mensagem, created_at
+            SELECT papel, mensagem
             FROM (
                 SELECT papel, mensagem, created_at
                 FROM chat_history
@@ -74,15 +63,7 @@ def carregar_historico(username: str, limite: int = 20) -> list[dict]:
             ORDER BY created_at ASC
         """, (username, limite))
         rows = cur.fetchall()
-    return [
-        {
-            "papel":      row["papel"],
-            "mensagem":   row["mensagem"],
-            "created_at": row["created_at"].isoformat(),
-        }
-        for row in rows
-    ]
-
+    return [{"papel": row["papel"], "mensagem": row["mensagem"]} for row in rows]
 
 
 def buscar_alimento(query: str) -> str:
@@ -180,7 +161,6 @@ def search_food_list(query: str) -> list[dict]:
     ]
 
 
-# ── Mercado ───────────────────────────────────────────────────────────────────
 
 def listar_parceiros() -> list[dict]:
     with conn() as c, c.cursor() as cur:

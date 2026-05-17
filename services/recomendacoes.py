@@ -78,15 +78,14 @@ def _pontuar_por_tags(produto: dict, tags: list[str]) -> tuple[float, str]:
 
 
 def recomendar_por_tags(tags: list[str], produtos: list[dict], n: int = 6) -> list[dict]:
-    """Seleciona e ordena produtos relevantes para as tags. Máx. 3 por categoria."""
     pontuados = sorted(
-        ((p, *_pontuar_por_tags(p, tags)) for p in produtos if p.get("ativo", True)),
+        ((p, *_pontuar_por_tags(p, tags)) for p in produtos),
         key=lambda x: x[1],
         reverse=True,
     )
 
-    resultado:    list[dict]      = []
-    contagem_cat: dict[str, int]  = {}
+    resultado:    list[dict]     = []
+    contagem_cat: dict[str, int] = {}
     MAX_POR_CAT = 3
 
     for produto, score, motivo in pontuados:

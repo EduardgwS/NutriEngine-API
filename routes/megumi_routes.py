@@ -45,10 +45,4 @@ def megumi_historico(
         limite:  int  = 50,
         usuario: dict = Depends(usuario_atual),
 ):
-    msgs = carregar_historico(usuario["user"], limite=limite)
-    return {
-        "mensagens": [
-            {"mensagem": m["mensagem"], "papel": m["papel"]}
-            for m in msgs
-        ]
-    }
+    return {"mensagens": carregar_historico(usuario["user"], limite=limite)}

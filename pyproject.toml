@@ -1,0 +1,7 @@
+[project]
+name            = "nutriengine-api"
+version         = "1.0.0"
+description     = "API do aplicativo nutricional NutriEngine"
+authors         = [{name = "ExplosionLab"}]
+license         = {text = "MIT"}
+requires-python = ">=3.12"
