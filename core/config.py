@@ -38,20 +38,3 @@ TACO_PROMPT = (
     "Use null em 'gramas' se não for possível estimar o peso. "
     "Se não houver alimento, responda: {\"alimento\": null, \"gramas\": null}"
 )
-
-#Verifca se todas as variáveis de ambiente estão definidas antes de iniciar
-_REQUIRED: dict[str, str | None] = {
-    "JWT_SECRET":       JWT_SECRET,
-    "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID,
-    "GEMINI_API_KEY":   GEMINI_API_KEY,
-    "PG_HOST":          os.getenv("PG_HOST"),
-    "PG_DATABASE":      os.getenv("PG_DATABASE"),
-    "PG_USER":          os.getenv("PG_USER"),
-    "PG_PASSWORD":      os.getenv("PG_PASSWORD"),
-}
-
-_ausentes = [nome for nome, valor in _REQUIRED.items() if not valor]
-if _ausentes:
-    raise EnvironmentError(
-        f"Variáveis de ambiente obrigatórias não definidas: {', '.join(_ausentes)}"
-    )

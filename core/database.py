@@ -4,10 +4,6 @@ from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
 from core.config import PG_DSN
 
-# ── Pool de conexões ──────────────────────────────────────────────────────────
-# Reutiliza conexões entre requests em vez de abrir/fechar a cada chamada.
-# MIN_CONN mantém conexões aquecidas; MAX_CONN evita saturar o banco.
-
 _pool: ThreadedConnectionPool | None = None
 _MIN_CONN = 2
 _MAX_CONN = 10
@@ -26,7 +22,6 @@ def _get_pool() -> ThreadedConnectionPool | None:
 
 @contextmanager
 def conn():
-    """Context manager que empresta uma conexão do pool e a devolve ao final."""
     pool = _get_pool()
     c = pool.getconn()
     try:
@@ -39,18 +34,13 @@ def conn():
         pool.putconn(c)
 
 
-# ── Helper de busca ───────────────────────────────────────────────────────────
 
 def _build_like_parts(query: str) -> tuple[list[str], list[str]]:
-    """
-    Quebra a query em palavras (mín. 3 chars) e gera os like_params (%palavra%).
-    Retorna (palavras, like_params).
-    """
+
     palavras   = [p for p in query.strip().lower().split() if len(p) > 2] or query.split()
     like_params = [f"%{p}%" for p in palavras]
     return palavras, like_params
 
-# ── Usuários ──────────────────────────────────────────────────────────────────
 
 def upsert_user(username: str, name: str, email: str):
     with conn() as c, c.cursor() as cur:
@@ -61,7 +51,6 @@ def upsert_user(username: str, name: str, email: str):
         """, (username, name, email))
 
 
-# ── Chat ──────────────────────────────────────────────────────────────────────
 
 def salvar_mensagem(username: str, papel: str, mensagem: str):
     with conn() as c, c.cursor() as cur:
@@ -95,10 +84,8 @@ def carregar_historico(username: str, limite: int = 20) -> list[dict]:
     ]
 
 
-# ── TACO ──────────────────────────────────────────────────────────────────────
 
 def buscar_alimento(query: str) -> str:
-    """Busca o alimento mais próximo na tabela TACO e retorna string de contexto para a Megumi."""
     if not query or len(query) < 2:
         return ""
 
@@ -145,7 +132,6 @@ def buscar_alimento(query: str) -> str:
 
 
 def search_food_list(query: str) -> list[dict]:
-    """Busca na tabela TACO para exibir na lista de pesquisa do app."""
     if not query:
         return []
 
@@ -197,7 +183,6 @@ def search_food_list(query: str) -> list[dict]:
 # ── Mercado ───────────────────────────────────────────────────────────────────
 
 def listar_parceiros() -> list[dict]:
-    """Retorna todos os parceiros ativos."""
     with conn() as c, c.cursor() as cur:
         cur.execute("""
             SELECT id, nome, logo_url, site_url
@@ -218,10 +203,6 @@ def listar_parceiros() -> list[dict]:
 
 
 def listar_produtos_ativos() -> list[dict]:
-    """
-    Retorna todos os produtos ativos junto com nome e logo do parceiro.
-    Usado pelo serviço de recomendação para montar o catálogo.
-    """
     with conn() as c, c.cursor() as cur:
         cur.execute("""
             SELECT

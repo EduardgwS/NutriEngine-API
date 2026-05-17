@@ -1,0 +1,32 @@
+{
+  "ALTA_PROTEINA": {
+    "categorias_alvo":      ["proteína"],
+    "categorias_penalizar": [],
+    "motivo":               "Excelente para bater sua meta de proteínas do dia."
+  },
+  "CARBOIDRATO": {
+    "categorias_alvo":      ["carboidrato"],
+    "categorias_penalizar": [],
+    "motivo":               "Boa fonte de carboidrato para repor sua energia."
+  },
+  "GORDURA_BOA": {
+    "categorias_alvo":      ["gordura"],
+    "categorias_penalizar": [],
+    "motivo":               "Rico em gorduras boas para complementar sua dieta."
+  },
+  "GANHAR_MUSCULOS": {
+    "categorias_alvo":      ["proteína", "carboidrato"],
+    "categorias_penalizar": [],
+    "motivo":               "Alta densidade calórica e proteica, ideal para ganho de massa."
+  },
+  "PERDER_PESO": {
+    "categorias_alvo":      ["proteína"],
+    "categorias_penalizar": ["gordura", "snack"],
+    "motivo":               "Baixa caloria e bom teor proteico, aliado do seu emagrecimento."
+  },
+  "MELHORAR_ALIMENTACAO": {
+    "categorias_alvo":      ["proteína", "carboidrato", "gordura"],
+    "categorias_penalizar": ["snack"],
+    "motivo":               "Produto de qualidade nutricional para uma alimentação equilibrada."
+  }
+}

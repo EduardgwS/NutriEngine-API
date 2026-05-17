@@ -66,5 +66,4 @@
             CREATE INDEX IF NOT EXISTS idx_nutriente_codigo ON nutriente(codigo_alimento);
             CREATE INDEX IF NOT EXISTS idx_nutriente_componente ON nutriente(componente);
 
-            -- Habilita pg_trgm para similarity() usado nas buscas
             CREATE EXTENSION IF NOT EXISTS pg_trgm;
