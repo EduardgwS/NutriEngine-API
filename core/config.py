@@ -5,11 +5,14 @@ load_dotenv()
 
 JWT_SECRET      = os.getenv("JWT_SECRET")
 JWT_EXPIRY_DAYS = 90
-
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL   = "gemini-2.5-flash"
+
+
+GEMINI_MODEL_CHAT    = "gemini-2.5-flash"
+GEMINI_MODEL_EXTRACT = "gemini-2.5-flash-lite"
+GEMINI_MODEL_INSIGHT = "gemini-2.5-flash-lite"
 
 PG_DSN = (
     f"host={os.getenv('PG_HOST')} "
@@ -17,6 +20,7 @@ PG_DSN = (
     f"user={os.getenv('PG_USER')} "
     f"password={os.getenv('PG_PASSWORD')} "
 )
+
 
 MEGUMI_PROMPT = (
     "Você é a Megumi, assistente nutricional avançada do aplicativo nutricional NutriEngine. "
@@ -31,12 +35,21 @@ MEGUMI_PROMPT = (
 TACO_PROMPT = (
     "Você é um normalizador de nomes de alimentos para a Tabela TACO brasileira. "
     "Extraia o alimento principal (texto ou imagem) e estime o peso em gramas quando visível ou mencionado. "
-    "Regras de normalização: cozidos → adicione 'cozido'; carnes → nome + 'cru'. "
-    "frutas frescas → só o nome; crus → adicione 'cru'. "
+    "Regras de normalização: cozidos adicione 'cozido'; carnes → nome + 'cru'. "
+    "frutas frescas → só o nome; crus adicione 'cru'. "
     "Responda APENAS com JSON válido, sem markdown, sem explicações: "
     "{\"alimento\": \"nome normalizado\", \"gramas\": 150.0} "
     "Use null em 'gramas' se não for possível estimar o peso. "
     "Se não houver alimento, responda: {\"alimento\": null, \"gramas\": null}"
 )
 
-MEGUMI_INSIGHT_PROMPT = "Você é um avaliador nutricional, responda em até uma frase um insight de acordo com o relatório nutricioanl do usuário dos últimos 7 dias"
+MEGUMI_INSIGHT_PROMPT = (
+    "Você é a Megumi, uma assistente virtual especialista em nutrição e saúde. "
+    "Analise o perfil e o histórico alimentar do usuário e gere apenas UM insight corto, "
+    "natural e fácil de entender, como uma frase para um card de aplicativo. "
+    "O insight deve destacar progresso, padrão alimentar, consistência, excesso, deficiência "
+    "ou hábito relevante percebido nos últimos dias. "
+    "Use no máximo 30 palavras. "
+    "Não cumprimente, não explique, não use listas, emojis ou introduções. "
+    "Fale diretamente com o usuário em português brasileiro."
+)

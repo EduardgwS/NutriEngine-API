@@ -1,10 +1,17 @@
-from __future__ import annotations
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field
 
 from core.auth import usuario_atual
-from core.database import buscar_alimento, carregar_historico, salvar_mensagem
-from services.gemini import extrair_alimento, responder_megumi
+from core.database import (
+    buscar_alimento,
+    buscar_ultimo_insight,
+    carregar_historico,
+    salvar_insight,
+    salvar_mensagem,
+)
+from services.gemini import extrair_alimento, gerar_insight_nutricional, responder_megumi
 
 megumi_router = APIRouter(prefix="/megumi", tags=["megumi"])
 
@@ -20,12 +27,12 @@ class PerfilSaude(BaseModel):
 
 
 class AlimentoRefeicao(BaseModel):
-    nome:             str
-    quantidade_g:     float
-    kcal:             float
-    proteinas_g:      float
-    carboidratos_g:   float
-    gorduras_g:       float
+    nome:           str
+    quantidade_g:   float
+    kcal:           float
+    proteinas_g:    float
+    carboidratos_g: float
+    gorduras_g:     float
 
 
 class Refeicao(BaseModel):
@@ -34,12 +41,12 @@ class Refeicao(BaseModel):
 
 
 class DiaNutricional(BaseModel):
-    data:             str
-    kcal_total:       float
-    proteinas_g:      float
-    carboidratos_g:   float
-    gorduras_g:       float
-    refeicoes:        list[Refeicao] = []
+    data:           str
+    kcal_total:     float
+    proteinas_g:    float
+    carboidratos_g: float
+    gorduras_g:     float
+    refeicoes:      list[Refeicao] = []
 
 
 class HistoricoSaude(BaseModel):
@@ -48,31 +55,26 @@ class HistoricoSaude(BaseModel):
 
 
 class MegumiChatRequest(BaseModel):
-    text:            str
+    text:            str            = Field(..., strip_whitespace=True, min_length=1)
     historico_saude: HistoricoSaude | None = None
 
-    @field_validator("text")
-    @classmethod
-    def text_nao_vazio(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("O campo 'text' não pode estar vazio.")
-        return v
+
+class MegumiInsightRequest(BaseModel):
+    historico_saude: HistoricoSaude
 
 
 
 @megumi_router.post("/chat")
-async def megumi_chat(
+def megumi_chat(
         payload: MegumiChatRequest,
         usuario: dict = Depends(usuario_atual),
 ):
-    alimento_info = extrair_alimento(payload.text)
-    contexto = (
-        buscar_alimento(alimento_info["alimento"])
-        if alimento_info.get("alimento")
-        else ""
-    )
+    username = usuario["user"]
 
-    historico = carregar_historico(usuario["user"], limite=20)
+    alimento_info = extrair_alimento(payload.text)
+    contexto = buscar_alimento(alimento_info["alimento"]) if alimento_info.get("alimento") else ""
+
+    historico = carregar_historico(username, limite=20)
     resposta  = responder_megumi(
         texto      = payload.text,
         contexto   = contexto,
@@ -80,9 +82,8 @@ async def megumi_chat(
         saude_json = payload.historico_saude.model_dump() if payload.historico_saude else None,
     )
 
-    salvar_mensagem(usuario["user"], "user",   payload.text)
-    salvar_mensagem(usuario["user"], "megumi", resposta)
-
+    salvar_mensagem(username, "user",   payload.text)
+    salvar_mensagem(username, "megumi", resposta)
     return {"response": resposta}
 
 
@@ -92,3 +93,26 @@ def megumi_historico(
         usuario: dict = Depends(usuario_atual),
 ):
     return {"mensagens": carregar_historico(usuario["user"], limite=limite)}
+
+
+@megumi_router.post("/insight")
+def megumi_insight(
+        payload: MegumiInsightRequest,
+        usuario: dict = Depends(usuario_atual),
+):
+    username = usuario["user"]
+
+    ultimo = buscar_ultimo_insight(username)
+    if ultimo:
+        criado_em = ultimo["created_at"]
+        agora     = datetime.now(criado_em.tzinfo) if criado_em.tzinfo else datetime.now()
+        if agora - criado_em < timedelta(hours=24):
+            return {"insight": ultimo["insight"]}
+
+    if not payload.historico_saude.historico_nutricional:
+        return {"insight": "Continue registrando suas refeições, que irei te dar um apoio!"}
+
+    resposta = gerar_insight_nutricional(saude_json=payload.historico_saude.model_dump())
+    if resposta:
+        salvar_insight(username, resposta)
+    return {"insight": resposta}
