@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
+
 def extrair_alimento(texto: str, imagem_bytes: bytes | None = None) -> dict:
     if not texto.strip() and not imagem_bytes:
         return {"alimento": None, "gramas": None}
@@ -72,44 +73,78 @@ def extrair_alimento(texto: str, imagem_bytes: bytes | None = None) -> dict:
         return {"alimento": None, "gramas": None}
 
 
+
 def _formatar_saude(saude: dict) -> str:
-    partes = []
+    blocos: list[str] = []
 
-    perfil = saude.get("perfil", {})
+    perfil = saude.get("perfil") or {}
     if perfil:
-        campos = [
-            ("peso_kg",           lambda v: f"peso {v} kg"),
-            ("altura_m",          lambda v: f"altura {v} m"),
-            ("idade",             lambda v: f"{v} anos"),
-            ("sexo",              lambda v: v),
-            ("objetivo",          lambda v: f"objetivo: {v}"),
-            ("nivel_atividade",   lambda v: f"atividade: {v}"),
-            ("kcal_recomendadas", lambda v: f"meta calórica: {v} kcal/dia"),
-        ]
-        linha = [fmt(perfil[k]) for k, fmt in campos if k in perfil]
-        if linha:
-            partes.append("Perfil do usuário: " + ", ".join(linha))
+        campos_perfil = {
+            "peso_kg":           lambda v: f"Peso: {v} kg",
+            "altura_m":          lambda v: f"Altura: {v} m",
+            "idade":             lambda v: f"Idade: {v} anos",
+            "sexo":              lambda v: f"Sexo: {v}",
+            "objetivo":          lambda v: f"Objetivo: {v}",
+            "nivel_atividade":   lambda v: f"Nível de atividade: {v}",
+            "kcal_recomendadas": lambda v: f"Meta calórica diária: {v} kcal",
+        }
+        linhas_perfil = [fmt(perfil[k]) for k, fmt in campos_perfil.items() if k in perfil and perfil[k] is not None]
+        if linhas_perfil:
+            blocos.append("=== PERFIL DO USUÁRIO ===\n" + "\n".join(linhas_perfil))
 
-    historico = saude.get("historico_nutricional", [])
+    historico = saude.get("historico_nutricional") or []
     if historico:
-        partes.append("Histórico nutricional dos últimos 7 dias:")
+        linhas_hist: list[str] = ["=== HISTÓRICO NUTRICIONAL ==="]
         for dia in historico:
-            partes.append(
-                f"  {dia['data']}: {dia['kcal']} kcal | "
-                f"prot {dia['proteinas_g']}g | "
-                f"carbo {dia['carboidratos_g']}g | "
-                f"gord {dia['gorduras_g']}g"
+            data           = dia.get("data", "?")
+            kcal_total     = dia.get("kcal_total", 0)
+            proteinas      = dia.get("proteinas_g", 0)
+            carboidratos   = dia.get("carboidratos_g", 0)
+            gorduras       = dia.get("gorduras_g", 0)
+            kcal_meta      = (saude.get("perfil") or {}).get("kcal_recomendadas")
+
+            saldo = ""
+            if kcal_meta:
+                diferenca = kcal_total - kcal_meta
+                saldo = f" | saldo: {diferenca:+.0f} kcal vs meta"
+
+            linhas_hist.append(
+                f"{data}"
+                f"Totais → {kcal_total:.0f} kcal{saldo}"
+                f" | Prot: {proteinas:.1f}g | Carbo: {carboidratos:.1f}g | Gord: {gorduras:.1f}g"
             )
 
-    return "\n".join(partes)
+            refeicoes = dia.get("refeicoes") or []
+            for refeicao in refeicoes:
+                hora      = refeicao.get("hora", "?")
+                alimentos = refeicao.get("alimentos") or []
+                if not alimentos:
+                    continue
+
+                linhas_hist.append(f"   🕐 {hora}")
+                for alimento in alimentos:
+                    nome         = alimento.get("nome", "?")
+                    qtd          = alimento.get("quantidade_g", 0)
+                    kcal         = alimento.get("kcal", 0)
+                    prot         = alimento.get("proteinas_g", 0)
+                    carbo        = alimento.get("carboidratos_g", 0)
+                    gord         = alimento.get("gorduras_g", 0)
+                    linhas_hist.append(
+                        f"      • {nome} ({qtd:.0f}g)"
+                        f" → {kcal:.0f} kcal | Prot: {prot:.1f}g | Carbo: {carbo:.1f}g | Gord: {gord:.1f}g"
+                    )
+
+        blocos.append("\n".join(linhas_hist))
+
+    return "\n\n".join(blocos)
+
 
 
 def responder_megumi(
-        texto:        str,
-        contexto:     str               = "",
-        imagem_bytes: bytes | None      = None,
-        historico:    list[dict] | None = None,
-        saude_json:   dict | None       = None,
+        texto:     str,
+        contexto:  str               = "",
+        historico: list[dict] | None = None,
+        saude_json: dict | None      = None,
 ) -> str | None:
     contents: list[types.Content] = [
         types.Content(
@@ -119,18 +154,15 @@ def responder_megumi(
         for msg in (historico or [])
     ]
 
-    turno: list = []
-    if imagem_bytes:
-        turno.append(types.Part.from_bytes(data=imagem_bytes, mime_type="image/jpeg"))
-
     partes_ctx  = [p for p in [contexto, _formatar_saude(saude_json) if saude_json else ""] if p]
-    texto_turno = f"{texto}\n\n{chr(10).join(partes_ctx)}".strip() or "Analise esta imagem nutricional."
-    turno.append(types.Part(text=texto_turno))
-    contents.append(types.Content(role="user", parts=turno))
+    texto_turno = f"{texto}\n\n{chr(10).join(partes_ctx)}".strip()
+    contents.append(types.Content(role="user", parts=[types.Part(text=texto_turno)]))
 
-    log.info(f"[MEGUMI] texto={texto!r} taco={contexto or '(vazio)'} "
-             f"saúde={'sim' if saude_json else 'não'} imagem={'sim' if imagem_bytes else 'não'} "
-             f"histórico={len(historico or [])} msgs")
+    log.info(
+        f"[MEGUMI] texto={texto!r} taco={contexto or '(vazio)'} "
+        f"saúde={'sim' if saude_json else 'não'} "
+        f"histórico={len(historico or [])} msgs"
+    )
 
     try:
         response = client.models.generate_content(
@@ -153,4 +185,4 @@ def responder_megumi(
 
     except Exception:
         log.error("[MEGUMI] Erro inesperado.")
-        return "Tive um problemão aqui, espera aí que eu vou tentar resolver e já volto!"
+        return "Tive um problemão aqui, tente novamente."

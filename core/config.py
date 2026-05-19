@@ -38,3 +38,5 @@ TACO_PROMPT = (
     "Use null em 'gramas' se não for possível estimar o peso. "
     "Se não houver alimento, responda: {\"alimento\": null, \"gramas\": null}"
 )
+
+MEGUMI_INSIGHT_PROMPT = "Você é um avaliador nutricional, responda em até uma frase um insight de acordo com o relatório nutricioanl do usuário dos últimos 7 dias"
